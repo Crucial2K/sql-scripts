@@ -12,7 +12,7 @@ CREATE FUNCTION dbo.dba_parseString_udf
           @stringToParse VARCHAR(8000)  
         , @delimiter     CHAR(1)
 )
-RETURNS @parsedString TABLE (stringValue VARCHAR(128))
+RETURNS @parsedString TABLE (stringValue VARCHAR(130))
 AS
 /*********************************************************************************
     Name:       dba_parseString_udf
@@ -73,9 +73,9 @@ GO
 
 /* First, we need to take care of schema updates, in case you have a legacy 
    version of the script installed */
-DECLARE @indexDefragLog_rename      VARCHAR(128)
-  , @indexDefragExclusion_rename    VARCHAR(128)
-  , @indexDefragStatus_rename       VARCHAR(128);
+DECLARE @indexDefragLog_rename      VARCHAR(130)
+  , @indexDefragExclusion_rename    VARCHAR(130)
+  , @indexDefragStatus_rename       VARCHAR(130);
 
 SELECT  @indexDefragLog_rename = 'dba_indexDefragLog_obsolete_' + CONVERT(VARCHAR(10), GETDATE(), 112)
       , @indexDefragExclusion_rename = 'dba_indexDefragExclusion_obsolete_' + CONVERT(VARCHAR(10), GETDATE(), 112);
@@ -99,11 +99,11 @@ BEGIN
     (
          indexDefrag_id     INT IDENTITY(1, 1)  NOT NULL
        , databaseID         INT                 NOT NULL
-       , databaseName       NVARCHAR(128)       NOT NULL
+       , databaseName       NVARCHAR(130)       NOT NULL
        , objectID           INT                 NOT NULL
-       , objectName         NVARCHAR(128)       NOT NULL
+       , objectName         NVARCHAR(130)       NOT NULL
        , indexID            INT                 NOT NULL
-       , indexName          NVARCHAR(128)       NOT NULL
+       , indexName          NVARCHAR(130)       NOT NULL
        , partitionNumber    SMALLINT            NOT NULL
        , fragmentation      FLOAT               NOT NULL
        , page_count         INT                 NOT NULL
@@ -129,11 +129,11 @@ BEGIN
     CREATE TABLE dbo.dba_indexDefragExclusion
     (
          databaseID         INT             NOT NULL
-       , databaseName       NVARCHAR(128)   NOT NULL
+       , databaseName       NVARCHAR(130)   NOT NULL
        , objectID           INT             NOT NULL
-       , objectName         NVARCHAR(128)   NOT NULL
+       , objectName         NVARCHAR(130)   NOT NULL
        , indexID            INT             NOT NULL
-       , indexName          NVARCHAR(128)   NOT NULL
+       , indexName          NVARCHAR(130)   NOT NULL
        , exclusionMask      INT             NOT NULL
             /* 1=Sunday, 2=Monday, 4=Tuesday, 8=Wednesday, 16=Thursday, 32=Friday, 64=Saturday */
 
@@ -153,16 +153,16 @@ BEGIN
     CREATE TABLE dbo.dba_indexDefragStatus
     (
          databaseID         INT             NOT NULL
-       , databaseName       NVARCHAR(128)   NOT NULL
+       , databaseName       NVARCHAR(130)   NOT NULL
        , objectID           INT             NOT NULL
        , indexID            INT             NOT NULL
        , partitionNumber    SMALLINT        NOT NULL
        , fragmentation      FLOAT           NOT NULL
        , page_count         INT             NOT NULL
        , range_scan_count   BIGINT          NOT NULL
-       , schemaName         NVARCHAR(128)   NULL
-       , objectName         NVARCHAR(128)   NULL
-       , indexName          NVARCHAR(128)   NULL
+       , schemaName         NVARCHAR(130)   NULL
+       , objectName         NVARCHAR(130)   NULL
+       , indexName          NVARCHAR(130)   NULL
        , scanDate           DATETIME        NOT NULL
        , defragDate         DATETIME        NULL
        , printStatus        BIT DEFAULT (0) NOT NULL
@@ -198,7 +198,7 @@ CREATE PROCEDURE dbo.dba_indexDefrag_sp
         /* Valid options are: ASC, DESC */
   , @timeLimit              INT                 = 720 /* defaulted to 12 hours */
         /* Optional time limitation; expressed in minutes */
-  , @database               VARCHAR(128)        = NULL
+  , @database               VARCHAR(130)        = NULL
         /* Option to specify one or more database names, separated by commas; NULL will return all */
   , @tableName              VARCHAR(4000)       = NULL  -- databaseName.schema.tableName
         /* Option to specify a table name; null will return all */
@@ -389,6 +389,9 @@ AS /****************************************************************************
                                     , cleaned up the create table section
                                     , updated syntax for case-sensitive databases
                                     , comma-delimited list for @database now supported
+    2019-01-04 PEH          4.2     Changed NVARCHAR(128) types to NVARCHAR(130) as object names
+                                    with the maximum size of 128 will fail when inserted into a table
+                                    using QUOTENAME().
 *********************************************************************************
     Example of how to call this script:
 
@@ -464,12 +467,12 @@ BEGIN
         /* Declare our variables */
         DECLARE   @objectID                 INT
                 , @databaseID               INT
-                , @databaseName             NVARCHAR(128)
+                , @databaseName             NVARCHAR(130)
                 , @indexID                  INT
                 , @partitionCount           BIGINT
-                , @schemaName               NVARCHAR(128)
-                , @objectName               NVARCHAR(128)
-                , @indexName                NVARCHAR(128)
+                , @schemaName               NVARCHAR(130)
+                , @objectName               NVARCHAR(130)
+                , @indexName                NVARCHAR(130)
                 , @partitionNumber          SMALLINT
                 , @fragmentation            FLOAT
                 , @pageCount                INT
@@ -503,14 +506,14 @@ BEGIN
         CREATE TABLE #databaseList
         (
               databaseID        INT
-            , databaseName      VARCHAR(128)
+            , databaseName      VARCHAR(130)
             , scanStatus        BIT
         );
 
         CREATE TABLE #processor 
         (
               [index]           INT
-            , Name              VARCHAR(128)
+            , Name              VARCHAR(130)
             , Internal_Value    INT
             , Character_Value   INT
         );
@@ -771,7 +774,7 @@ BEGIN
             SET @getIndexSQL_Param = N'@objectID_Out        INT OUTPUT
                                      , @indexID_Out         INT OUTPUT
                                      , @databaseID_Out      INT OUTPUT
-                                     , @databaseName_Out    NVARCHAR(128) OUTPUT
+                                     , @databaseName_Out    NVARCHAR(130) OUTPUT
                                      , @fragmentation_Out   INT OUTPUT
                                      , @partitionNumber_Out INT OUTPUT
                                      , @pageCount_Out       INT OUTPUT
