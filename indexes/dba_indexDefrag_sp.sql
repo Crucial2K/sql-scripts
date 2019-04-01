@@ -392,6 +392,7 @@ AS /****************************************************************************
     2019-01-04 PEH          4.2     Changed NVARCHAR(128) types to NVARCHAR(130) as object names
                                     with the maximum size of 128 will fail when inserted into a table
                                     using QUOTENAME().
+                                    Added @IgnoreDatabases option.
 *********************************************************************************
     Example of how to call this script:
 
@@ -580,9 +581,8 @@ BEGIN
 
         /* Retrieve the list of databases to investigate */
         /* If @database is NULL, it means we want to defrag *all* databases */
-        IF @database IS NULL
+        IF @database IS NULL AND @ignoreDatabases IS NULL
         BEGIN
-
             INSERT INTO #databaseList
             SELECT database_id
                 , name
@@ -592,23 +592,50 @@ BEGIN
                 AND [state] = 0 -- state must be ONLINE
                 AND is_read_only = 0;  -- cannot be read_only
 
-        END;
-        ELSE
-        /* Otherwise, we're going to just defrag our list of databases */
-        BEGIN
+        END;		       
 
-            INSERT INTO #databaseList
+        /* Otherwise, we're going to just defrag our list of databases */
+		IF @ignoreDatabases IS NULL AND @database IS NOT null			
+		BEGIN
+			INSERT INTO #databaseList
+			SELECT database_id
+				, name
+				, 0 -- not scanned yet for fragmentation
+			FROM sys.databases AS d
+			JOIN dbo.dba_parseString_udf(@database, ',') AS x
+				ON d.name = x.stringValue
+			WHERE [name] NOT IN ('master', 'tempdb')-- exclude system databases
+				AND [state] = 0 -- state must be ONLINE
+				AND is_read_only = 0;  -- cannot be read_only
+		END		
+
+		 /* Update the temp table to ignore the databases specified */		
+		IF @database IS NULL AND @ignoreDatabases IS NOT NULL			
+		BEGIN
+			/* Get all the datbases then...*/
+			INSERT INTO #databaseList
             SELECT database_id
                 , name
                 , 0 -- not scanned yet for fragmentation
-            FROM sys.databases AS d
-            JOIN dbo.dba_parseString_udf(@database, ',') AS x
-                ON d.name COLLATE database_default = x.stringValue
+            FROM sys.databases
             WHERE [name] NOT IN ('master', 'tempdb')-- exclude system databases
                 AND [state] = 0 -- state must be ONLINE
                 AND is_read_only = 0;  -- cannot be read_only
 
-        END; 
+			/* ...delete the databases we don't want to affect*/
+			DELETE d
+			FROM #databaseList AS d
+			JOIN dbo.dba_parseString_udf(@ignoreDatabases, ',') AS x
+				ON d.databaseName = x.stringValue
+			END;	
+		/* Check for parameter error */
+		IF @database IS NOT NULL AND @ignoreDatabases IS NOT NULL	
+		BEGIN
+		DECLARE @Notice VARCHAR(MAX) = 'Both @database and @ignoreDatabases cannot have values, one or other must be NULL. See help for details.'
+			,@LineNumber INT = ERROR_LINE()
+
+			RAISERROR (@Notice, @LineNumber,0, 42) WITH NOWAIT;
+		END	
 
         /* Check to see IF we have indexes in need of defrag; otherwise, re-scan the database(s) */
         IF NOT EXISTS(SELECT Top 1 * FROM dbo.dba_indexDefragStatus WHERE defragDate IS NULL)
